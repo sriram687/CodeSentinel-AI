@@ -1,0 +1,24 @@
+# PyTorch & Large Model Weights
+*.bin
+*.pt
+*.pth
+*.tar
+*.zip
+
+# Data & Models Directories
+models/*/
+!models/README.md
+data/*/
+!data/README.md
+
+# Python Cache & Environment
+__pycache__/
+*.py[cod]
+*$py.class
+.ipynb_checkpoints/
+.DS_Store
+
+# Logs & Temp Files
+*.log
+tmp.c
+scratch/
