@@ -21,7 +21,7 @@ export default function Sidebar({ activeTab, setActiveTab, apiStatus }) {
       </div>
       <div className="nav-section-title">Documentation</div>
       <div className={`nav-item ${activeTab === 'docs' ? 'active' : ''}`} onClick={() => setActiveTab('docs')}>
-        <BookOpen size={18} /><span>Fumadocs Docs & API</span>
+        <BookOpen size={18} /><span>API Guide</span>
       </div>
       <div className="server-status">
         <div className={`status-dot ${apiStatus === 'offline' ? 'offline' : ''}`} />

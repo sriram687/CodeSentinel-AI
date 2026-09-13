@@ -156,7 +156,7 @@ export default function App() {
           onClick={() => setActiveTab('docs')}
         >
           <BookOpen size={17} />
-          <span>Fumadocs API Guide</span>
+          <span>API Guide</span>
         </div>
 
         <button className="theme-toggle-btn" onClick={toggleTheme}>
@@ -181,7 +181,7 @@ export default function App() {
           <div className="header-title">
             {activeTab === 'studio' && 'Vulnerability Detection Studio'}
             {activeTab === 'models' && 'Model Architecture Catalog (10 Fine-tuned Models)'}
-            {activeTab === 'docs' && 'Fumadocs Framework Documentation'}
+            {activeTab === 'docs' && 'API Documentation Guide'}
           </div>
 
           <div className="template-selector">
