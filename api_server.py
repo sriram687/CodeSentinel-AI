@@ -61,13 +61,29 @@ def health_check():
         "model_count": len(LOADED_MODELS)
     })
 
+@app.route("/api/models", methods=["GET"])
+def list_models_endpoint():
+    models_info = [
+        {"name": name, "domain": desc, "status": "loaded" if name in LOADED_MODELS else "unavailable"}
+        for name, desc in MODELS_CONFIG
+    ]
+    return jsonify({
+        "total": len(models_info),
+        "models": models_info
+    })
+
 @app.route("/api/scan", methods=["POST"])
 def scan_code_endpoint():
-    data = request.get_json(force=True)
-    raw_code = data.get("code", "")
-    
-    if not raw_code.strip():
-        return jsonify({"error": "Code snippet is empty"}), 400
+    try:
+        data = request.get_json(force=True, silent=True)
+        if not data or not isinstance(data, dict):
+            return jsonify({"error": "Invalid request payload. Expected JSON object with 'code' field."}), 400
+
+        raw_code = data.get("code", "")
+        if not raw_code or not str(raw_code).strip():
+            return jsonify({"error": "Code snippet is empty or missing."}), 400
+    except Exception as e:
+        return jsonify({"error": f"Failed to parse JSON body: {str(e)}"}), 400
 
     cleaned = clean_code(raw_code)
     encoded = tokenizer.encode(cleaned)
