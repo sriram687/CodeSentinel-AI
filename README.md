@@ -1,6 +1,6 @@
 # CodeSentinel-AI: Deep Learning Vulnerability Scanner & Fumadocs Studio
 
-![CodeSentinel Architecture](VB.png)
+## CodeSentinel Architecture
 
 CodeSentinel-AI is a deep learning-based source code vulnerability detection platform powered by pre-trained RoBERTa representations and fine-tuned classifiers (MLP and 1D-CNN) trained across real-world open-source C/C++ projects and benchmark security datasets.
 
