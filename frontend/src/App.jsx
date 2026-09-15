@@ -10,7 +10,10 @@ import {
   FileCode, 
   Terminal,
   Sun,
-  Moon
+  Moon,
+  Trash2,
+  Copy,
+  Check
 } from 'lucide-react';
 
 const CODE_TEMPLATES = {
@@ -72,6 +75,7 @@ export default function App() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [apiStatus, setApiStatus] = useState('connecting');
+  const [copiedReport, setCopiedReport] = useState(false);
 
   useEffect(() => {
     document.documentElement.className = theme === 'dark' ? 'dark' : '';
@@ -93,6 +97,27 @@ export default function App() {
     setSelectedTemplate(key);
     setCode(CODE_TEMPLATES[key].code);
     setScanResult(null);
+  };
+
+  const handleClearCode = () => {
+    setCode('');
+    setScanResult(null);
+  };
+
+  const copyAuditReport = () => {
+    if (!scanResult) return;
+    const reportText = `[CodeSentinel Audit Report]
+Status: ${scanResult.status}
+Max Risk: ${scanResult.max_risk_score}%
+Top Model: ${scanResult.top_model}
+Total Models Scanned: ${scanResult.total_models_scanned}
+
+Model Breakdown:
+${scanResult.model_results.map(m => `- ${m.model_name} (${m.domain}): ${m.risk_score}% [${m.status}]`).join('\n')}`;
+
+    navigator.clipboard.writeText(reportText);
+    setCopiedReport(true);
+    setTimeout(() => setCopiedReport(false), 2000);
   };
 
   const runVulnerabilityScan = async () => {
@@ -227,29 +252,50 @@ export default function App() {
                   </div>
                 </div>
 
-                <button 
-                  className="primary-btn" 
-                  onClick={runVulnerabilityScan}
-                  disabled={isScanning}
-                >
-                  {isScanning ? (
-                    <>
-                      <Zap size={18} className="animate-spin" />
-                      Running Multi-Model Audit...
-                    </>
-                  ) : (
-                    <>
-                      <Play size={18} />
-                      Run Security Audit Scan
-                    </>
-                  )}
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button 
+                    className="primary-btn" 
+                    onClick={runVulnerabilityScan}
+                    disabled={isScanning}
+                    style={{ flex: 1 }}
+                  >
+                    {isScanning ? (
+                      <>
+                        <Zap size={18} className="animate-spin" />
+                        Running Multi-Model Audit...
+                      </>
+                    ) : (
+                      <>
+                        <Play size={18} />
+                        Run Security Audit Scan
+                      </>
+                    )}
+                  </button>
+                  <button 
+                    className="theme-toggle-btn"
+                    onClick={handleClearCode}
+                    title="Clear editor text"
+                    style={{ marginTop: 0, padding: '0 14px' }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
 
               {/* Right Column: Scan Results */}
               <div className="editorial-card">
                 <div className="card-title">
                   <span>Security Audit & Max-Risk Analysis</span>
+                  {scanResult && (
+                    <button 
+                      onClick={copyAuditReport} 
+                      className="theme-toggle-btn" 
+                      style={{ marginTop: 0, padding: '4px 8px', fontSize: '0.75rem' }}
+                    >
+                      {copiedReport ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
+                      <span>{copiedReport ? 'Copied' : 'Copy Report'}</span>
+                    </button>
+                  )}
                 </div>
 
                 {scanResult ? (
