@@ -1,4 +1,5 @@
 import os
+import threading
 import clang
 from clang import cindex
 from tokenizers import Tokenizer, normalizers, pre_tokenizers, processors
@@ -22,7 +23,8 @@ class MyTokenizer:
 
     def clang_split(self, i, normalized_string):
         tok = []
-        tu = self.cidx.parse('tmp.c', args=[''], unsaved_files=[('tmp.c', str(normalized_string.original))], options=0)
+        tmp_filename = f"tmp_{os.getpid()}_{threading.get_ident()}.c"
+        tu = self.cidx.parse(tmp_filename, args=[''], unsaved_files=[(tmp_filename, str(normalized_string.original))], options=0)
         for t in tu.get_tokens(extent=tu.cursor.extent):
             spelling = t.spelling.strip()
             if spelling != '':
