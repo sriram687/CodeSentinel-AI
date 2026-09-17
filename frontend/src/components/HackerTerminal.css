@@ -1,0 +1,324 @@
+:root {
+  --bg-color: #fcfbf9;
+  --panel-bg: #ffffff;
+  --border-color: #000000;
+  --text-dark: #333333;
+  --terminal-bg: #1a1a1a;
+  --terminal-text: #00ff80;
+  
+  --claude-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.hacker-terminal-container {
+  display: flex;
+  flex-direction: column;
+  height: 94vh;
+  width: 96vw;
+  max-height: 94vh;
+  max-width: 96vw;
+  margin: 0;
+  background: var(--panel-bg);
+  border: 2px solid #000000;
+  border-radius: 12px;
+  box-shadow: var(--claude-shadow);
+  overflow: hidden;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+.terminal-header {
+  background: #141416;
+  padding: 12px 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #000000;
+  z-index: 10;
+  color: #ffffff;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.window-dots {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-close { background-color: #ff5f56; }
+.dot-minimize { background-color: #ffbd2e; }
+.dot-expand { background-color: #27c93f; }
+
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brand-prompt {
+  color: #00ff80;
+  font-family: 'Fira Code', monospace;
+  font-size: 1.05rem;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(0, 255, 128, 0.5);
+}
+
+.brand-name {
+  font-family: 'Fira Code', monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: #ffffff;
+}
+
+.brand-ai {
+  color: #00ff80;
+  text-shadow: 0 0 8px rgba(0, 255, 128, 0.4);
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+}
+
+.engine-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  background: #222226;
+  padding: 6px 14px;
+  border-radius: 20px;
+  color: #a1a1aa;
+  border: 1px solid #333338;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.engine-status strong {
+  color: #f4f4f5;
+  font-weight: 600;
+}
+
+
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.server-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-family: 'Fira Code', monospace;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  background-color: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulse-glow 1.8s infinite;
+}
+
+@keyframes pulse-glow {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.terminal-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  padding: 20px;
+  gap: 20px;
+  background: var(--bg-color);
+}
+
+/* The dark terminal parts */
+.logs-container {
+  flex: 1;
+  padding: 25px;
+  background: var(--terminal-bg);
+  border-radius: 10px;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: 'Fira Code', 'Courier New', monospace;
+}
+
+.log-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.log-system { color: #88ccff; }
+.log-action { color: #ffffff; }
+.log-error { color: #ff6b6b; }
+.log-success { color: #51cf66; }
+
+.prompt-arrow {
+  color: var(--terminal-text);
+  font-weight: bold;
+}
+
+.log-icon {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.code-patch {
+  background: #111;
+  border-left: 3px solid var(--terminal-text);
+  padding: 15px;
+  margin: 10px 0;
+  color: #aaddff;
+  white-space: pre-wrap;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.input-container {
+  width: 600px;
+  min-width: 400px;
+  max-width: 950px;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  background: var(--panel-bg);
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--claude-shadow);
+  resize: horizontal;
+  overflow: auto;
+}
+
+.input-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-dark);
+  margin-bottom: 15px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+.input-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-select {
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #1e1e24;
+  color: #00ff80;
+  border: 1px solid #33333d;
+  font-size: 0.78rem;
+  font-family: 'Fira Code', monospace;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-select:hover {
+  border-color: #00ff80;
+}
+
+.editor-wrapper {
+  flex: 1;
+  min-height: 200px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  background: transparent;
+}
+
+.scan-button {
+  margin-top: 20px;
+  background: #1a1a1a;
+  color: #ffffff;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: background 0.2s ease;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.scan-button:hover:not(:disabled) {
+  background: #333333;
+}
+
+.scan-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.scan-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.scan-button.scanning {
+  background: #2d3748;
+}
+
+.blink {
+  animation: blinker 1s linear infinite;
+}
+
+@keyframes blinker {
+  50% { opacity: 0.5; }
+}
+
+/* Clean scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}

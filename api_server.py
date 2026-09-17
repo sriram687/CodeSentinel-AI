@@ -1,163 +1,143 @@
 import os
 import sys
 import logging
-import re
 import torch
+import torch.nn.functional as F
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-import clang
-from clang import cindex
-
-# Suppress verbose transformers logging
-logging.getLogger("transformers").setLevel(logging.ERROR)
-os.environ["TRANSFORMERS_VERBOSITY"] = "error"
-
-# Configure libclang DLL path for Windows
-dll_path = os.path.join(os.path.dirname(clang.__file__), "native", "libclang.dll")
-if os.path.exists(dll_path):
-    cindex.Config.set_library_file(dll_path)
-
-# Bypass transformers torch.load version check
 import transformers.utils.import_utils
 import transformers.modeling_utils
 transformers.utils.import_utils.check_torch_load_is_safe = lambda: None
 transformers.modeling_utils.check_torch_load_is_safe = lambda: None
 
-from utils.cleaner import clean_code
+from transformers import RobertaModel, AutoModelForCausalLM, AutoTokenizer
+from models import VulBERTa_Extend
 from utils.tokenizer_utils import load_custom_tokenizer
-from utils.model_loader import load_sequence_model
+from utils.cleaner import clean_code
+
+# Suppress verbose loggers
+logging.getLogger("transformers").setLevel(logging.ERROR)
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
 
 app = Flask(__name__)
 CORS(app)
 
-print("Pre-loading VulBERTa Tokenizer...")
-tokenizer = load_custom_tokenizer("./tokenizer/drapgh-vocab.json", "./tokenizer/drapgh-merges.txt")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
 
-MODELS_CONFIG = [
-    ("VB-MLP_draper", "General C/C++ GitHub Benchmark"),
-    ("VB-MLP_devign", "OS Kernel & Production Systems (Linux/QEMU)"),
-    ("VB-MLP_reveal", "Imbalanced Chromium/Debian Codebase"),
-    ("VB-MLP_vuldeepecker", "API Misuse & Buffer Violations"),
-    ("VB-MLP_d2a", "IBM Static Analysis False Positive Filter"),
-]
+# Global variables for models
+encoder_model = None
+encoder_tokenizer = None
+decoder_model = None
+decoder_tokenizer = None
 
-# Cache loaded models in memory for fast scanning
-LOADED_MODELS = {}
-for m_name, desc in MODELS_CONFIG:
-    path = os.path.join("./models", m_name)
-    if os.path.exists(path):
-        try:
-            print(f"Loading model into memory: {m_name}...")
-            LOADED_MODELS[m_name] = (load_sequence_model(path), desc)
-        except Exception as e:
-            print(f"Failed to load {m_name}: {e}")
+def load_pipeline():
+    global encoder_model, encoder_tokenizer, decoder_model, decoder_tokenizer
+    
+    print("1. Loading VulBERTa Encoder (Vulnerability Detector)...")
+    encoder_tokenizer = load_custom_tokenizer("tokenizer/drapgh-vocab.json", "tokenizer/drapgh-merges.txt", max_length=512)
+    base_model = RobertaModel.from_pretrained("models/VulBERTa")
+
+    encoder_path = "models/VulBERTa_Unified_Fixed/best_model/pytorch_model.bin"
+    if not os.path.exists(encoder_path):
+        encoder_path = "models/VulBERTa_Unified/best_model/pytorch_model.bin"
+
+    if os.path.exists(encoder_path):
+        encoder_model = VulBERTa_Extend(base_model=base_model, n_classes=2, dropout=0.1)
+        encoder_model.load_state_dict(torch.load(encoder_path, map_location=device))
+        encoder_model.to(device)
+        encoder_model.eval()
+        print(f"   ✅ Encoder loaded from: {encoder_path}")
+    else:
+        print(f"   ❌ Could not find encoder checkpoint at {encoder_path}. Using base un-finetuned model for fallback.")
+        encoder_model = VulBERTa_Extend(base_model=base_model, n_classes=2, dropout=0.1).to(device)
+
+    print("2. Loading Qwen Decoder (Patch Generator)...")
+    decoder_path = "decoder/decoder_checkpoints_v3/final_student"
+    if not os.path.exists(decoder_path):
+        decoder_path = "decoder/decoder_checkpoints/final_student"
+
+    if os.path.exists(decoder_path):
+        decoder_model = AutoModelForCausalLM.from_pretrained(decoder_path, torch_dtype=torch.bfloat16).to(device)
+        decoder_tokenizer = AutoTokenizer.from_pretrained(decoder_path)
+        decoder_model.eval()
+        print(f"   ✅ Decoder loaded from: {decoder_path}")
+    else:
+        print(f"   ❌ Could not find decoder checkpoint at {decoder_path}. Patching will be disabled.")
 
 @app.route("/api/health", methods=["GET"])
 def health_check():
     return jsonify({
         "status": "online",
-        "loaded_models": list(LOADED_MODELS.keys()),
-        "model_count": len(LOADED_MODELS)
+        "encoder_loaded": encoder_model is not None,
+        "decoder_loaded": decoder_model is not None
     })
 
-@app.route("/api/models", methods=["GET"])
-def list_models_endpoint():
-    models_info = [
-        {"name": name, "domain": desc, "status": "loaded" if name in LOADED_MODELS else "unavailable"}
-        for name, desc in MODELS_CONFIG
-    ]
-    return jsonify({
-        "total": len(models_info),
-        "models": models_info
-    })
-
-@app.route("/api/scan", methods=["POST"])
-def scan_code_endpoint():
+@app.route("/api/analyze", methods=["POST"])
+def analyze_code():
     try:
         data = request.get_json(force=True, silent=True)
         if not data or not isinstance(data, dict):
-            return jsonify({"error": "Invalid request payload. Expected JSON object with 'code' field."}), 400
+            return jsonify({"error": "Invalid request. Expected JSON with 'code' field."}), 400
 
         raw_code = data.get("code", "")
-        if not raw_code or not str(raw_code).strip():
-            return jsonify({"error": "Code snippet is empty or missing."}), 400
+        if not raw_code.strip():
+            return jsonify({"error": "Code snippet is empty."}), 400
     except Exception as e:
         return jsonify({"error": f"Failed to parse JSON body: {str(e)}"}), 400
 
+    if not encoder_model:
+        return jsonify({"error": "Encoder model is not loaded."}), 500
+
+    # Clean and Tokenize
     cleaned = clean_code(raw_code)
-    encoded = tokenizer.encode(cleaned)
-    input_ids = torch.tensor([encoded.ids])
-    attention_mask = torch.tensor([encoded.attention_mask])
+    encoded = encoder_tokenizer.encode(cleaned)
+    input_ids = torch.tensor([encoded.ids]).to(device)
+    attention_mask = torch.tensor([encoded.attention_mask]).to(device)
 
-    model_results = []
-    
-    for m_name, (model, desc) in LOADED_MODELS.items():
-        try:
-            with torch.no_grad():
-                outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-                probs = torch.nn.functional.softmax(outputs.logits, dim=1)
-                vuln_prob = round(probs[0][1].item() * 100, 2)
-                pred = torch.argmax(probs, dim=1).item()
-                status = "VULNERABLE" if pred == 1 else "SAFE"
-                
-                model_results.append({
-                    "model_name": m_name,
-                    "domain": desc,
-                    "risk_score": vuln_prob,
-                    "status": status
-                })
-        except Exception as e:
-            model_results.append({
-                "model_name": m_name,
-                "domain": desc,
-                "risk_score": 0.0,
-                "status": "ERROR",
-                "error": str(e)
-            })
+    # 1. Scan with Encoder
+    with torch.no_grad():
+        outputs = encoder_model(input_ids=input_ids, attention_mask=attention_mask)
+        probs = F.softmax(outputs.logits, dim=1)
+        vuln_score = round(probs[0][1].item() * 100, 2)
 
-    # Line-level risk highlight computation using simple keyword & pattern matching as fallback/enhancement
-    lines = raw_code.split("\n")
-    line_highlights = []
-    
-    # Risky C API keywords
-    risky_patterns = [r'\bstrcpy\b', r'\bgets\b', r'\bstrcat\b', r'\bfree\b', r'\bmalloc\b', r'\bsprintf\b', r'\bmemcpy\b']
-    
-    max_risk = max([m["risk_score"] for m in model_results]) if model_results else 0.0
-    top_model = max(model_results, key=lambda x: x["risk_score"])["model_name"] if model_results else "None"
+    is_vulnerable = vuln_score > 50.0
+    patch_text = None
 
-    for idx, line in enumerate(lines, 1):
-        line_str = line.strip()
-        has_risky_call = any(re.search(pat, line_str) for pat in risky_patterns)
+    # 2. Repair with Decoder if vulnerable
+    if is_vulnerable and decoder_model:
+        prompt = (
+            f"<|im_start|>system\nYou are an expert C/C++ security engineer.<|im_end|>\n"
+            f"<|im_start|>user\n<vuln_found CWE='CWE-120'>\n{raw_code.strip()}\n</vuln_found><patch>\n<|im_end|>\n"
+            f"<|im_start|>assistant\n"
+        )
+        dec_inputs = decoder_tokenizer(prompt, return_tensors="pt").to(device)
         
-        if max_risk >= 50.0 and has_risky_call:
-            line_score = round(min(98.5, max_risk * 1.05), 1)
-            is_vuln = True
-        elif has_risky_call:
-            line_score = 45.0
-            is_vuln = False
-        else:
-            line_score = round(max(2.0, max_risk * 0.08), 1)
-            is_vuln = False
+        # Stop at </patch> if running v3
+        stop_token_id = decoder_tokenizer.encode("</patch>", add_special_tokens=False)
+        stop_ids = stop_token_id if stop_token_id else []
 
-        line_highlights.append({
-            "line_num": idx,
-            "code": line,
-            "risk_score": line_score,
-            "is_vulnerable_line": is_vuln
-        })
+        with torch.no_grad():
+            generated_ids = decoder_model.generate(
+                **dec_inputs,
+                max_new_tokens=300,
+                temperature=0.1,
+                do_sample=True,
+                repetition_penalty=1.5,
+                eos_token_id=[decoder_tokenizer.eos_token_id] + stop_ids,
+                pad_token_id=decoder_tokenizer.eos_token_id
+            )
 
-    is_overall_vulnerable = max_risk >= 50.0
+        patch_text = decoder_tokenizer.decode(generated_ids[0][dec_inputs.input_ids.shape[1]:], skip_special_tokens=True).strip()
 
     return jsonify({
-        "status": "VULNERABLE" if is_overall_vulnerable else "SAFE",
-        "max_risk_score": max_risk,
-        "top_model": top_model,
-        "total_models_scanned": len(model_results),
-        "model_results": model_results,
-        "line_highlights": line_highlights
+        "vuln_score": vuln_score,
+        "vulnerable": is_vulnerable,
+        "patch": patch_text
     })
 
 if __name__ == "__main__":
-    print("Starting CodeSentinel-AI Backend API Server on http://localhost:5000...")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    load_pipeline()
+    print("\n🚀 CodeSentinel-AI Unified Pipeline Server started on port 5050!")
+    app.run(host="0.0.0.0", port=5050, debug=False)
