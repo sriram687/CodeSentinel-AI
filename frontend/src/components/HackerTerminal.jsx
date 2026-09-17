@@ -32,7 +32,8 @@ const HackerTerminal = () => {
     setIsScanning(true);
 
     try {
-      const response = await fetch('http://localhost:5050/api/analyze', {
+      const apiHost = window.location.hostname || 'localhost';
+      const response = await fetch(`http://${apiHost}:5050/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code })
